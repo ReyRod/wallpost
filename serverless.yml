@@ -1,0 +1,81 @@
+service: 'wallpost'
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment:
+    DB_HOSTNAME:
+      Fn::GetAtt:
+        - DBInstance
+        - Endpoint.Address
+    DB_PORT:
+      Fn::GetAtt:
+        - DBInstance
+        - Endpoint.Port
+    DB_NAME: '${self:service}_${self:provider.stage}_db'
+    DB_USERNAME: 'wallpost'
+    DB_PASSWORD: '123456789'
+    COGNITO_USER_POOL_ID:
+      Ref: UserPool
+    COGNITO_CLIENT_ID: 
+      Ref: UserPoolClient
+
+package:
+  individually: true
+  exclude:
+    - '*'
+    - '**/*'
+
+functions:
+  signup:
+    handler: 'signup.handler'
+    package:
+      include:
+        - signup.js
+    events:
+      - http:
+          path: signup
+          method: post
+  signin:
+    handler: 'signin.handler'
+    package:
+      include:
+        - signin.js
+    events:
+      - http:
+          path: signin
+          method: post
+  getWall:
+    handler: 'getWall.handler'
+    package:
+      include:
+        - getWall.js
+        - node_modules/**
+    events:
+      - http:
+          path: getWall
+          method: get
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+  post:
+    handler: 'post.handler'
+    package:
+      include:
+        - post.js
+        - node_modules/**
+    events:
+      - http:
+          path: post
+          method: post
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+resources:
+  - ${file(resources/cognito.yml)}
+  - ${file(resources/rds.yml)}
